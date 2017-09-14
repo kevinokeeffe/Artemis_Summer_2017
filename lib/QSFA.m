@@ -13,13 +13,13 @@
 %%
 function xt = QSFA(t, Et, Ip, tau_max, dipole, fft_int)
 
-if ~exist('dipole', 'var')
+if ~exist('dipole', 'var') || isempty(dipole)
 	dipole = @Hydrogenlike;
 elseif ischar(dipole)
 	dipole = eval(dipole);
 end
 
-if ~exist('fft_int', 'var')
+if ~exist('fft_int', 'var') || isempty(fft_int)
 	fft_int = false;
 end
 
@@ -28,24 +28,33 @@ dt = diff(t(1:2));						%	Temporal resolution
 
 DN = ceil(tau_max/dt);					%	Number of delay samples to integrate
 
-t1 = (DN:-1:1)'*dt;						%	Temporal padding for delay int
-Et1 = Et(1)*exp(-(3*t1/tau_max).^2);	%	Append exponential to initial field
-Et = [Et1; Et];
-
-t = [t(1)-t1; t];						%	Padded temporal axis
-Nt = length(t);							%	Number of time samples
-
-At = -cumtrapz(t, Et);					%	Vector potential
-Bt = cumtrapz(t, At);					%	Inegral of VP
-B2t = .5*cumtrapz(t, At.^2);			%	Integral of .5*VP^2
+%	Calculate indefinite integrals
+if ~fft_int
+	At = -cumtrapz(t, Et);					%	Vector potential
+	Bt = cumtrapz(t, At);					%	Inegral of VP
+	B2t = .5*cumtrapz(t, At.^2);			%	Integral of .5*VP^2
+else
+	dw = 2*pi/(Nt*dt);
+	w = ifftshift(((0:Nt-1).'-floor(Nt/2))*dw);
+	iw = i./w;
+	iw(~isfinite(iw)) = 0;
+	
+	Ew = Time2Freq(Et);
+	Aw = -iw.*Ew;
+	Bt = real(Freq2Time(iw.*Aw));
+% 	Bt = Bt - Bt(end);
+	At = real(Freq2Time(Aw));
+	At = At-At(end);
+	B2t = real(.5*Freq2Time(Time2Freq(At.^2).*iw));
+end
 
 indr = (DN+1:Nt)';						%	Recombination indices
 indi = (1:DN)' + (0:Nt-DN-1);			%	Ionization indices
 
 tau = t(DN+1)-t(1:DN);					%	Delays
 
+%	Calculate definite integrals
 Bt = Bt(indr).' - Bt(indi);
-
 B2t = B2t(indr).' - B2t(indi);
 
 
@@ -66,7 +75,7 @@ A = (pi ./ (.5i*tau)).^1.5;				%	Amplitude factor
 A = A .* dpf .* dpi .* Et(indi) .* exp(-1i*S);
 
 %	Dipole moment
-xt = -2*dt*trapz(imag(A)).';
+xt = [zeros(DN, 1); dt*trapz(imag(A)).'];
 end
 
 function dp = Hydrogenlike(p, Ip)
