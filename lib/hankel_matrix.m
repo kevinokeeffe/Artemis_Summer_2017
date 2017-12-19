@@ -49,10 +49,10 @@ function s_HT = hankel_matrix(order, R, Nr, eps_roots)
 %		Ur0 = exp(-(H.r/DR0).^2);
 %		Ukr0 = H.T * (Ur0./H.JR);
 %		k0 = 2*pi/800e-9;
-%		kz = realsqrt((k0^2 - H.kr.^2).*(k0>H.kr));
+%		kz = sqrt((k0^2 - H.kr.^2).*(k0>H.kr));
 %		z = (-5e-3:1e-5:5e-3);
-%		Ukrz = bsxfun(@times, Ukr0, exp(i*kz*z));
-%		Urz = bsxfun(@times, H.T * Ukrz, H.JR);
+%		Ukrz = Ukr0 .* exp(i*kz*z);
+%		Urz = (H.T * Ukrz) .* H.JR;
 %
 %	See also bessel_zeros, besselj
 
